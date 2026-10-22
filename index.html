@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Control HMI ESP32 - Web Bluetooth</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background-color: #2a2a2a;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 320px;
+        }
+        button {
+            background-color: #007acc;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        button:hover { background-color: #005999; }
+        .slider-container { margin: 20px 0; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        #status { font-weight: bold; color: #ff5555; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Control DSP ESP32</h2>
+    <div id="status">Estado: Desconectado</div>
+    <button onclick="conectarBLE()">Buscar ESP32_DSP</button>
+
+    <div class="slider-container">
+        <label for="paramSlider">Parámetro: <span id="valLabel">50</span></label><br><br>
+        <input type="range" id="paramSlider" min="0" max="100" value="50" oninput="enviarParametro(this.value)">
+    </div>
+</div>
+
+<script>
+    // UUIDs definidos en tu ESP32
+    const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+    const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+
+    let caracteristicaBLE = null;
+
+    async function conectarBLE() {
+        const statusDiv = document.getElementById("status");
+        try {
+            statusDiv.innerText = "Buscando...";
+            statusDiv.style.color = "#ffaa00";
+
+            // Pedir al navegador que busque la ESP32 por BLE
+            const device = await navigator.bluetooth.requestDevice({
+                
+				//filters: [{ name: 'ESP32_DSP' }],
+				acceptAllDevices: true,
+                optionalServices: [SERVICE_UUID]
+            });
+
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService(SERVICE_UUID);
+            caracteristicaBLE = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+            statusDiv.innerText = "Estado: Conectado por BLE";
+            statusDiv.style.color = "#55ff55";
+        } catch (error) {
+            console.error(error);
+            statusDiv.innerText = "Error / Cancelado";
+            statusDiv.style.color = "#ff5555";
+        }
+    }
+
+    async function enviarParametro(valor) {
+        document.getElementById("valLabel").innerText = valor;
+
+        if (caracteristicaBLE) {
+            try {
+                // Enviar el número convertido a texto
+                const encoder = new TextEncoder();
+                await caracteristicaBLE.writeValue(encoder.encode(valor.toString()));
+            } catch (e) {
+                console.error("Error al enviar:", e);
+            }
+        }
+    }
+</script>
+
+</body>
+</html>
